@@ -116,4 +116,4 @@ def internal_error(error):
 
 if __name__ == '__main__':
     # Use 0.0.0.0 to bind to all interfaces in Docker
-    app.run(debug=False, host='0.0.0.0', port=5050) 
+    app.run(debug=False, host='::', port=5050) 
