@@ -7,7 +7,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:5000"
+BASE_URL = "http://localhost:5050"
 
 def test_health():
     """Test the health endpoint"""
@@ -22,7 +22,7 @@ def test_health():
             print(f"❌ Health check failed: {response.status_code}")
             return False
     except requests.exceptions.ConnectionError:
-        print("❌ Could not connect to server. Make sure it's running on localhost:5000")
+        print("❌ Could not connect to server. Make sure it's running on localhost:5050")
         return False
 
 def test_voices():

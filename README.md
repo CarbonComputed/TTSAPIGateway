@@ -29,7 +29,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The server will start on `http://localhost:5000`
+The server will start on `http://localhost:5050`
 
 ## API Endpoints
 
@@ -86,13 +86,13 @@ Returns an AAC audio file as an attachment.
 
 ```bash
 # Health check
-curl http://localhost:5000/health
+curl http://localhost:5050/health
 
 # Get available voices
-curl http://localhost:5000/voices
+curl http://localhost:5050/voices
 
 # Generate audio
-curl -X POST http://localhost:5000/generate \
+curl -X POST http://localhost:5050/generate \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello world!", "voice": "expr-voice-2-f"}' \
   --output output.aac
@@ -104,7 +104,7 @@ curl -X POST http://localhost:5000/generate \
 import requests
 
 # Generate audio
-response = requests.post('http://localhost:5000/generate', 
+response = requests.post('http://localhost:5050/generate', 
     json={
         'text': 'Hello, this is a test message.',
         'voice': 'expr-voice-2-f'
@@ -123,7 +123,7 @@ else:
 
 ```javascript
 // Generate audio
-fetch('http://localhost:5000/generate', {
+fetch('http://localhost:5050/generate', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ For production use, consider:
 1. Using a production WSGI server like Gunicorn:
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+gunicorn -w 4 -b 0.0.0.0:5050 app:app
 ```
 
 2. Adding environment variables for configuration

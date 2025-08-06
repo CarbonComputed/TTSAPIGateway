@@ -28,11 +28,11 @@ else
 fi
 
 # Start the server
-echo "🎯 Starting Flask server on http://localhost:5000"
+echo "🎯 Starting Flask server on http://localhost:5050"
 echo "📝 API Documentation:"
-echo "   - Health check: GET http://localhost:5000/health"
-echo "   - Get voices: GET http://localhost:5000/voices"
-echo "   - Generate audio: POST http://localhost:5000/generate"
+echo "   - Health check: GET http://localhost:5050/health"
+echo "   - Get voices: GET http://localhost:5050/voices"
+echo "   - Generate audio: POST http://localhost:5050/generate"
 echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""

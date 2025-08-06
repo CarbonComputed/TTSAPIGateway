@@ -79,9 +79,9 @@ def generate_audio():
             audio_segment = AudioSegment.from_wav(temp_wav.name)
             
             # Create temporary file for AAC
-            with tempfile.NamedTemporaryFile(suffix='.aac', delete=False) as temp_aac:
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_aac:
                 # Export as AAC
-                audio_segment.export(temp_aac.name, format='aac', bitrate='128k')
+                audio_segment.export(temp_aac.name, format='mp4', bitrate='128k')
                 
                 # Clean up WAV file
                 os.unlink(temp_wav.name)
@@ -89,9 +89,9 @@ def generate_audio():
                 # Return AAC file
                 return send_file(
                     temp_aac.name,
-                    mimetype='audio/aac',
+                    mimetype='audio/mp4',
                     as_attachment=True,
-                    download_name=f'generated_audio_{voice}.aac'
+                    download_name=f'generated_audio_{voice}.mp4'
                 )
     
     except Exception as e:
@@ -116,4 +116,4 @@ def internal_error(error):
 
 if __name__ == '__main__':
     # Use 0.0.0.0 to bind to all interfaces in Docker
-    app.run(debug=False, host='0.0.0.0', port=5000) 
+    app.run(debug=False, host='0.0.0.0', port=5050) 

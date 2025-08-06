@@ -60,7 +60,7 @@ else
     # Run the container
     docker run -d \
         --name tts-api-gateway \
-        -p 5000:5000 \
+        -p 5050:5050 \
         -v $(pwd)/audio_output:/app/audio_output \
         --restart unless-stopped \
         tts-api-gateway
@@ -80,11 +80,11 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}🎯 API is now available at: http://localhost:5000${NC}"
+echo -e "${GREEN}🎯 API is now available at: http://localhost:5050${NC}"
 echo -e "${YELLOW}📝 API Endpoints:${NC}"
-echo "   - Health check: GET http://localhost:5000/health"
-echo "   - Get voices: GET http://localhost:5000/voices"
-echo "   - Generate audio: POST http://localhost:5000/generate"
+echo "   - Health check: GET http://localhost:5050/health"
+echo "   - Get voices: GET http://localhost:5050/voices"
+echo "   - Generate audio: POST http://localhost:5050/generate"
 echo ""
 echo -e "${YELLOW}🛑 To stop the container:${NC}"
 if [ "$USE_COMPOSE" = true ]; then
