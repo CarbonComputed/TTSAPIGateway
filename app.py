@@ -156,10 +156,6 @@ def combine_audio_segments_simple(audio_segments, sample_rate=24000):
     # Concatenate all segments
     final_audio = np.concatenate(combined)
     
-    # Final normalization of the entire combined audio
-    final_max = np.max(np.abs(final_audio))
-    if final_max > 0:
-        final_audio = final_audio * (0.95 / final_max)
     
     return final_audio
 
@@ -355,7 +351,7 @@ def generate_audio():
             # Generate audio for entire text at once (original method)
             logger.info("Generating audio for entire text without chunking")
             combined_audio = generate_sentence_audio(text, voice)
-            combined_audio = normalize_audio(combined_audio)
+            # combined_audio = normalize_audio(combined_audio)
         
         # Create output buffer
         output_buffer = io.BytesIO()
@@ -368,7 +364,7 @@ def generate_audio():
         elif output_format == 'mp4':
             # Convert to mp4
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-                sf.write(temp_wav.name, combined_audio, 24000, subtype='PCM_16')
+                sf.write(temp_wav.name, combined_audio, 24000)
                 audio_segment = AudioSegment.from_wav(temp_wav.name)
                 audio_segment.export(output_buffer, format='mp4', bitrate='128k')
                 os.unlink(temp_wav.name)
@@ -377,7 +373,7 @@ def generate_audio():
         else:  # mp3
             # Convert to MP3 with high quality settings
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-                sf.write(temp_wav.name, combined_audio, 24000, subtype='PCM_16')
+                sf.write(temp_wav.name, combined_audio, 24000)
                 audio_segment = AudioSegment.from_wav(temp_wav.name)
                 audio_segment.export(output_buffer, format='mp3', bitrate='192k', parameters=['-q:a', '0'])
                 os.unlink(temp_wav.name)
