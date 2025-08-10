@@ -117,8 +117,113 @@ def normalize_audio(audio_data):
     
     return audio_data
 
-def combine_audio_segments(audio_segments, sample_rate=24000):
-    """Combine multiple audio segments into one with improved audio handling"""
+def combine_audio_segments_simple(audio_segments, sample_rate=24000):
+    """Combine audio segments using direct numpy concatenation (no format conversion)"""
+    if not audio_segments:
+        raise ValueError("No audio segments to combine")
+    
+    if len(audio_segments) == 1:
+        return normalize_audio(audio_segments[0])
+    
+    # Normalize each segment individually to maintain consistent levels
+    normalized_segments = []
+    for segment in audio_segments:
+        # Ensure proper data type
+        if segment.dtype != np.float32:
+            segment = segment.astype(np.float32)
+        
+        # Normalize to prevent clipping while maintaining relative levels
+        max_val = np.max(np.abs(segment))
+        if max_val > 0:
+            # Normalize to 0.8 to leave headroom and prevent clipping
+            normalized_segment = segment * (0.8 / max_val)
+        else:
+            normalized_segment = segment
+        
+        normalized_segments.append(normalized_segment)
+    
+    # Calculate pause samples (150ms = 3600 samples at 24kHz for better separation)
+    pause_samples = int(0.15 * sample_rate)
+    pause_audio = np.zeros(pause_samples, dtype=np.float32)
+    
+    # Combine segments with pauses
+    combined = []
+    for i, segment in enumerate(normalized_segments):
+        if i > 0:
+            combined.append(pause_audio)
+        combined.append(segment)
+    
+    # Concatenate all segments
+    final_audio = np.concatenate(combined)
+    
+    # Final normalization of the entire combined audio
+    final_max = np.max(np.abs(final_audio))
+    if final_max > 0:
+        final_audio = final_audio * (0.95 / final_max)
+    
+    return final_audio
+
+def combine_audio_segments_advanced(audio_segments, sample_rate=24000):
+    """Advanced combination with crossfading and better audio processing"""
+    if not audio_segments:
+        raise ValueError("No audio segments to combine")
+    
+    if len(audio_segments) == 1:
+        return normalize_audio(audio_segments[0])
+    
+    # Normalize and prepare segments
+    normalized_segments = []
+    for segment in audio_segments:
+        if segment.dtype != np.float32:
+            segment = segment.astype(np.float32)
+        
+        # Apply gentle normalization
+        max_val = np.max(np.abs(segment))
+        if max_val > 0:
+            normalized_segment = segment * (0.85 / max_val)
+        else:
+            normalized_segment = segment
+        
+        normalized_segments.append(normalized_segment)
+    
+    # Calculate pause with fade in/out for smoother transitions
+    pause_samples = int(0.2 * sample_rate)  # 200ms pause
+    fade_samples = int(0.01 * sample_rate)  # 10ms fade
+    
+    # Create pause with fade
+    pause_audio = np.zeros(pause_samples, dtype=np.float32)
+    
+    # Combine with crossfading
+    combined = []
+    for i, segment in enumerate(normalized_segments):
+        if i > 0:
+            # Add pause with fade
+            combined.append(pause_audio)
+        
+        # Apply fade in/out to segment
+        if len(segment) > 2 * fade_samples:
+            # Fade in
+            fade_in = np.linspace(0, 1, fade_samples)
+            segment[:fade_samples] *= fade_in
+            
+            # Fade out
+            fade_out = np.linspace(1, 0, fade_samples)
+            segment[-fade_samples:] *= fade_out
+        
+        combined.append(segment)
+    
+    # Concatenate all segments
+    final_audio = np.concatenate(combined)
+    
+    # Final normalization
+    final_max = np.max(np.abs(final_audio))
+    if final_max > 0:
+        final_audio = final_audio * (0.95 / final_max)
+    
+    return final_audio
+
+def combine_audio_segments_pydub(audio_segments, sample_rate=24000):
+    """Combine audio segments using pydub (original method for comparison)"""
     if not audio_segments:
         raise ValueError("No audio segments to combine")
     
@@ -185,6 +290,8 @@ def generate_audio():
         max_chars = data.get('max_chars', 400)  # Configurable character limit
         max_words = data.get('max_words', 50)   # Configurable word limit
         output_format = data.get('format', 'mp3')  # Output format: mp3, wav, mp4
+        use_chunking = data.get('use_chunking', True)  # Enable/disable chunking
+        combine_method = data.get('combine_method', 'simple')  # simple, advanced, pydub
         
         # Validate inputs
         if not text:
@@ -203,33 +310,52 @@ def generate_audio():
                 'error': f'Invalid format. Supported formats: mp3, wav, mp4'
             }), 400
         
+        if combine_method not in ['simple', 'advanced', 'pydub']:
+            return jsonify({
+                'error': f'Invalid combine method. Supported methods: simple, advanced, pydub'
+            }), 400
+        
         # Check if model is loaded
         if model is None:
             return jsonify({'error': 'TTS model not loaded'}), 500
         
-        logger.info(f"Generating audio for text: '{text[:50]}...' with voice: {voice}, format: {output_format}")
+        logger.info(f"Generating audio for text: '{text[:50]}...' with voice: {voice}, format: {output_format}, chunking: {use_chunking}, combine: {combine_method}")
         
-        # Split text using spaCy with length limits
-        chunks = split_text_with_spacy(text, max_chars, max_words)
-        logger.info(f"Split text into {len(chunks)} chunks using spaCy")
-        
-        if len(chunks) == 0:
-            return jsonify({'error': 'No valid text chunks found'}), 400
-        
-        # Generate audio for each chunk
-        audio_segments = []
-        for i, chunk in enumerate(chunks):
-            logger.info(f"Processing chunk {i+1}/{len(chunks)}: '{chunk[:30]}...'")
-            try:
-                audio_segment = generate_sentence_audio(chunk, voice)
-                audio_segments.append(audio_segment)
-            except Exception as e:
-                logger.error(f"Failed to generate audio for chunk {i+1}: {e}")
-                return jsonify({'error': f'Failed to generate audio for chunk {i+1}: {str(e)}'}), 500
-        
-        # Combine all audio segments
-        logger.info("Combining audio segments...")
-        combined_audio = combine_audio_segments(audio_segments)
+        if use_chunking:
+            # Split text using spaCy with length limits
+            chunks = split_text_with_spacy(text, max_chars, max_words)
+            logger.info(f"Split text into {len(chunks)} chunks using spaCy")
+            
+            if len(chunks) == 0:
+                return jsonify({'error': 'No valid text chunks found'}), 400
+            
+            # Generate audio for each chunk
+            audio_segments = []
+            for i, chunk in enumerate(chunks):
+                logger.info(f"Processing chunk {i+1}/{len(chunks)}: '{chunk[:30]}...'")
+                try:
+                    audio_segment = generate_sentence_audio(chunk, voice)
+                    audio_segments.append(audio_segment)
+                except Exception as e:
+                    logger.error(f"Failed to generate audio for chunk {i+1}: {e}")
+                    return jsonify({'error': f'Failed to generate audio for chunk {i+1}: {str(e)}'}), 500
+            
+            # Combine all audio segments using the specified method
+            logger.info("Combining audio segments...")
+            if combine_method == 'simple':
+                combined_audio = combine_audio_segments_simple(audio_segments)
+                logger.info("Used simple combination method")
+            elif combine_method == 'advanced':
+                combined_audio = combine_audio_segments_advanced(audio_segments)
+                logger.info("Used advanced combination method")
+            else:  # pydub
+                combined_audio = combine_audio_segments_pydub(audio_segments)
+                logger.info("Used pydub combination method")
+        else:
+            # Generate audio for entire text at once (original method)
+            logger.info("Generating audio for entire text without chunking")
+            combined_audio = generate_sentence_audio(text, voice)
+            combined_audio = normalize_audio(combined_audio)
         
         # Create output buffer
         output_buffer = io.BytesIO()
