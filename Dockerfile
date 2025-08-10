@@ -15,15 +15,6 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     curl \
-    libasound2 \
-    libasound2-dev \
-    libportaudio2 \
-    libportaudio-dev \
-    libavcodec-extra \
-    libavformat-dev \
-    libavutil-dev \
-    libswresample-dev \
-    libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
