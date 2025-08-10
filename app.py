@@ -7,6 +7,7 @@ import tempfile
 from pydub import AudioSegment
 import logging
 import re
+import numpy as np
 
 app = Flask(__name__)
 
@@ -99,20 +100,41 @@ def generate_sentence_audio(sentence, voice):
         logger.error(f"Error generating audio for sentence '{sentence[:30]}...': {e}")
         raise
 
+def normalize_audio(audio_data):
+    """Normalize audio to prevent clipping and improve quality"""
+    if audio_data is None or len(audio_data) == 0:
+        return audio_data
+    
+    # Convert to float32 if needed
+    if audio_data.dtype != np.float32:
+        audio_data = audio_data.astype(np.float32)
+    
+    # Normalize to prevent clipping
+    max_val = np.max(np.abs(audio_data))
+    if max_val > 0:
+        # Normalize to 0.95 to leave some headroom
+        audio_data = audio_data * (0.95 / max_val)
+    
+    return audio_data
+
 def combine_audio_segments(audio_segments, sample_rate=24000):
-    """Combine multiple audio segments into one"""
+    """Combine multiple audio segments into one with improved audio handling"""
     if not audio_segments:
         raise ValueError("No audio segments to combine")
     
     if len(audio_segments) == 1:
-        return audio_segments[0]
+        return normalize_audio(audio_segments[0])
     
     # Convert numpy arrays to AudioSegment objects
     combined_audio = None
     for i, audio_data in enumerate(audio_segments):
+        # Normalize the audio data
+        audio_data = normalize_audio(audio_data)
+        
         # Create temporary WAV file for this segment
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-            sf.write(temp_wav.name, audio_data, sample_rate)
+            # Save as WAV with proper format
+            sf.write(temp_wav.name, audio_data, sample_rate, subtype='PCM_16')
             
             # Load as AudioSegment
             segment = AudioSegment.from_wav(temp_wav.name)
@@ -131,9 +153,10 @@ def combine_audio_segments(audio_segments, sample_rate=24000):
             # Clean up temporary file
             os.unlink(temp_wav.name)
     
-    # Convert back to numpy array
+    # Convert back to numpy array with proper format
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-        combined_audio.export(temp_wav.name, format='wav')
+        # Export with high quality settings
+        combined_audio.export(temp_wav.name, format='wav', parameters=['-ar', str(sample_rate)])
         audio_data, _ = sf.read(temp_wav.name)
         os.unlink(temp_wav.name)
         return audio_data
@@ -161,6 +184,7 @@ def generate_audio():
         voice = data.get('voice', 'expr-voice-2-f')  # Default voice
         max_chars = data.get('max_chars', 400)  # Configurable character limit
         max_words = data.get('max_words', 50)   # Configurable word limit
+        output_format = data.get('format', 'mp3')  # Output format: mp3, wav, aac
         
         # Validate inputs
         if not text:
@@ -174,11 +198,16 @@ def generate_audio():
                 'error': f'Invalid voice. Available voices: {AVAILABLE_VOICES}'
             }), 400
         
+        if output_format not in ['mp3', 'wav', 'aac']:
+            return jsonify({
+                'error': f'Invalid format. Supported formats: mp3, wav, aac'
+            }), 400
+        
         # Check if model is loaded
         if model is None:
             return jsonify({'error': 'TTS model not loaded'}), 500
         
-        logger.info(f"Generating audio for text: '{text[:50]}...' with voice: {voice}")
+        logger.info(f"Generating audio for text: '{text[:50]}...' with voice: {voice}, format: {output_format}")
         
         # Split text using spaCy with length limits
         chunks = split_text_with_spacy(text, max_chars, max_words)
@@ -202,33 +231,43 @@ def generate_audio():
         logger.info("Combining audio segments...")
         combined_audio = combine_audio_segments(audio_segments)
         
-        # Create temporary file for WAV
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
-            # Save as WAV first (KittenTTS outputs at 24kHz)
-            sf.write(temp_wav.name, combined_audio, 24000)
-            
-            # Convert WAV to MP3 using pydub
-            audio_segment = AudioSegment.from_wav(temp_wav.name)
-            
-            # Create output buffer
-            output_buffer = io.BytesIO()
-            
-            # Export as MP3
-            audio_segment.export(output_buffer, format='mp3', bitrate='128k')
-            
-            # Clean up WAV file
-            os.unlink(temp_wav.name)
-            
-            # Reset buffer position
-            output_buffer.seek(0)
-            
-            # Return MP3 file
-            return send_file(
-                output_buffer,
-                mimetype='audio/mpeg',
-                as_attachment=True,
-                download_name=f'generated_audio_{voice}.mp3'
-            )
+        # Create output buffer
+        output_buffer = io.BytesIO()
+        
+        if output_format == 'wav':
+            # Export as WAV with high quality
+            sf.write(output_buffer, combined_audio, 24000, subtype='PCM_16', format='WAV')
+            mimetype = 'audio/wav'
+            extension = 'wav'
+        elif output_format == 'aac':
+            # Convert to AAC
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                sf.write(temp_wav.name, combined_audio, 24000, subtype='PCM_16')
+                audio_segment = AudioSegment.from_wav(temp_wav.name)
+                audio_segment.export(output_buffer, format='aac', bitrate='128k')
+                os.unlink(temp_wav.name)
+            mimetype = 'audio/aac'
+            extension = 'aac'
+        else:  # mp3
+            # Convert to MP3 with high quality settings
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                sf.write(temp_wav.name, combined_audio, 24000, subtype='PCM_16')
+                audio_segment = AudioSegment.from_wav(temp_wav.name)
+                audio_segment.export(output_buffer, format='mp3', bitrate='192k', parameters=['-q:a', '0'])
+                os.unlink(temp_wav.name)
+            mimetype = 'audio/mpeg'
+            extension = 'mp3'
+        
+        # Reset buffer position
+        output_buffer.seek(0)
+        
+        # Return audio file
+        return send_file(
+            output_buffer,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f'generated_audio_{voice}.{extension}'
+        )
     
     except Exception as e:
         logger.error(f"Error generating audio: {e}")
