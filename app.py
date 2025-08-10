@@ -184,7 +184,7 @@ def generate_audio():
         voice = data.get('voice', 'expr-voice-2-f')  # Default voice
         max_chars = data.get('max_chars', 400)  # Configurable character limit
         max_words = data.get('max_words', 50)   # Configurable word limit
-        output_format = data.get('format', 'mp3')  # Output format: mp3, wav, aac
+        output_format = data.get('format', 'mp3')  # Output format: mp3, wav, mp4
         
         # Validate inputs
         if not text:
@@ -198,9 +198,9 @@ def generate_audio():
                 'error': f'Invalid voice. Available voices: {AVAILABLE_VOICES}'
             }), 400
         
-        if output_format not in ['mp3', 'wav', 'aac']:
+        if output_format not in ['mp3', 'wav', 'mp4']:
             return jsonify({
-                'error': f'Invalid format. Supported formats: mp3, wav, aac'
+                'error': f'Invalid format. Supported formats: mp3, wav, mp4'
             }), 400
         
         # Check if model is loaded
@@ -239,15 +239,15 @@ def generate_audio():
             sf.write(output_buffer, combined_audio, 24000, subtype='PCM_16', format='WAV')
             mimetype = 'audio/wav'
             extension = 'wav'
-        elif output_format == 'aac':
-            # Convert to AAC
+        elif output_format == 'mp4':
+            # Convert to mp4
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
                 sf.write(temp_wav.name, combined_audio, 24000, subtype='PCM_16')
                 audio_segment = AudioSegment.from_wav(temp_wav.name)
-                audio_segment.export(output_buffer, format='aac', bitrate='128k')
+                audio_segment.export(output_buffer, format='mp4', bitrate='128k')
                 os.unlink(temp_wav.name)
-            mimetype = 'audio/aac'
-            extension = 'aac'
+            mimetype = 'audio/mp4'
+            extension = 'mp4'
         else:  # mp3
             # Convert to MP3 with high quality settings
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
