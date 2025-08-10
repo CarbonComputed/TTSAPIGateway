@@ -122,25 +122,6 @@ def combine_audio_segments_simple(audio_segments, sample_rate=24000):
     if not audio_segments:
         raise ValueError("No audio segments to combine")
     
-    if len(audio_segments) == 1:
-        return normalize_audio(audio_segments[0])
-    
-    # Normalize each segment individually to maintain consistent levels
-    normalized_segments = []
-    for segment in audio_segments:
-        # Ensure proper data type
-        if segment.dtype != np.float32:
-            segment = segment.astype(np.float32)
-        
-        # Normalize to prevent clipping while maintaining relative levels
-        max_val = np.max(np.abs(segment))
-        if max_val > 0:
-            # Normalize to 0.8 to leave headroom and prevent clipping
-            normalized_segment = segment * (0.8 / max_val)
-        else:
-            normalized_segment = segment
-        
-        normalized_segments.append(normalized_segment)
     
     # Calculate pause samples (150ms = 3600 samples at 24kHz for better separation)
     pause_samples = int(0.15 * sample_rate)
@@ -148,7 +129,7 @@ def combine_audio_segments_simple(audio_segments, sample_rate=24000):
     
     # Combine segments with pauses
     combined = []
-    for i, segment in enumerate(normalized_segments):
+    for i, segment in enumerate(audio_segments):
         if i > 0:
             combined.append(pause_audio)
         combined.append(segment)
