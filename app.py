@@ -125,11 +125,14 @@ def combine_audio_segments_simple(audio_segments, sample_rate=24000):
     
     # Calculate pause samples (150ms = 3600 samples at 24kHz for better separation)
     pause_samples = int(0.15 * sample_rate)
-    pause_audio = np.zeros(pause_samples, dtype=np.float32)
+    pause_audio = np.zeros((pause_samples,), dtype=np.float32)
+
     
     # Combine segments with pauses
     combined = []
     for i, segment in enumerate(audio_segments):
+        segment = np.squeeze(segment).astype(np.float32)
+        segment = segment.astype(np.float32)
         if i > 0:
             combined.append(pause_audio)
         combined.append(segment)
